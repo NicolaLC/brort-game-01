@@ -132,44 +132,155 @@ var EGameResult = {
   Tie: 2
 };
 exports.EGameResult = EGameResult;
-},{}],"js/main.js":[function(require,module,exports) {
+},{}],"js/game/graphics.js":[function(require,module,exports) {
 "use strict";
 
-var _constants = require("./constants");
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.showModal = exports.clear = exports.render = void 0;
+
+var _logic = require("./logic");
+
+var opponentSide = document.getElementById("opponent-side");
+var opponentDeckCells = opponentSide.querySelectorAll(".deck-grid-cell");
+var playerSide = document.getElementById("player-side");
+var playerCardsCells = playerSide.querySelectorAll(".deck-grid-cell");
+var playerDeckContainer = playerSide.querySelector(".player-deck");
+var log = document.querySelector(".log");
+var modal;
+
+var render = function render() {
+  renderOpponent();
+  renderPlayer();
+  log.innerHTML = _logic.playerTurn ? "Your turn! <span>Press <b>[SPACE]</b> to draw, <b>[ESC]</b> to exit.</span>" : "Opponent Turn!";
+};
+
+exports.render = render;
+
+var clear = function clear() {
+  opponentDeckCells.forEach(function (element) {
+    element.innerHTML = "";
+  });
+  playerCardsCells.forEach(function (element) {
+    element.innerHTML = "";
+  });
+  playerDeckContainer.innerHTML = "";
+
+  if (modal != null) {
+    modal.close();
+  }
+
+  log.innerHTML = "";
+};
+
+exports.clear = clear;
+
+var renderOpponent = function renderOpponent() {
+  _logic.opponentCards.forEach(function (card, index) {
+    opponentDeckCells[index].innerHTML = "<div class=\"card\">".concat(card, "</div>");
+  });
+};
+
+var renderPlayer = function renderPlayer() {
+  _logic.playerCards.forEach(function (card, index) {
+    playerCardsCells[index].innerHTML = "<div class=\"card\">".concat(card, "</div>");
+  });
+
+  var result = "";
+
+  _logic.playerDeck.forEach(function (card) {
+    var bUsed = _logic.playerCards.indexOf(card) > -1;
+    result += "<div class=\"card ".concat(bUsed ? "used" : "", "\">").concat(card, "</div>");
+  });
+
+  playerDeckContainer.innerHTML = result;
+};
+
+var showModal = function showModal(title, content, proceedLabel, cancelLabel, onProceed, onCancel) {
+  var html = "\n\t\t\t<div class=\"dialog-title\">\n\t\t\t\t".concat(title, "\n\t\t\t</div>\n\t\t\t<div class=\"dialog-content\">\n\t\t\t\t").concat(content, "\n\t\t\t</div>\n\t\t\t<div class=\"dialog-actions\">\n\t\t\t</div>\n\t\t");
+
+  if (modal == null) {
+    var newModal = document.createElement("dialog");
+    newModal.classList.add("modal");
+    newModal.innerHTML = html;
+    modal = document.body.appendChild(newModal);
+  } else {
+    modal.innerHTML = html;
+  }
+
+  var actions = modal.querySelector(".dialog-actions");
+
+  if (cancelLabel) {
+    var cancelButton = document.createElement("button");
+    cancelButton.innerHTML = cancelLabel;
+    cancelButton.addEventListener("click", function () {
+      modal.close();
+
+      if (onCancel) {
+        onCancel();
+      }
+    });
+    actions.appendChild(cancelButton);
+  }
+
+  var proceedButton = document.createElement("button");
+  proceedButton.innerHTML = proceedLabel;
+  proceedButton.addEventListener("click", function () {
+    modal.close();
+
+    if (onProceed) {
+      onProceed();
+    }
+  });
+  actions.appendChild(proceedButton);
+  modal.showModal();
+};
+
+exports.showModal = showModal;
+},{"./logic":"js/game/logic.js"}],"js/game/logic.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.playerTurn = exports.playerDeck = exports.opponentCards = exports.playerCards = exports.intro = void 0;
+
+var _constants = require("../constants");
+
+var _graphics = require("./graphics");
 
 var consoleContainer = document.getElementById('console');
 var playerDeck = [];
+exports.playerDeck = playerDeck;
 var playerCards = [];
+exports.playerCards = playerCards;
 var opponentDeck = [];
 var opponentCards = [];
+exports.opponentCards = opponentCards;
 var playerWins = 0;
 var opponentWins = 0;
 var currentLevel = 1;
 var maxLevel = 21;
+var playerTurn = true;
+exports.playerTurn = playerTurn;
 
 var writeToConsole = function writeToConsole(message) {
   consoleContainer.innerHTML += "".concat(message ? message : "", "</br>");
+  (0, _graphics.render)();
 };
 
 var clearConsole = function clearConsole() {
   consoleContainer.innerHTML = "";
+  (0, _graphics.clear)();
 };
 
 var intro = function intro() {
-  writeToConsole("<b>Welcome player</b>");
-  writeToConsole();
-  writeToConsole("Press <b>[SPACEBAR]</b> to start a new game...");
-
-  var onKeyHandler = function onKeyHandler(e) {
-    if (e.keyCode === 32) {
-      document.removeEventListener('keydown', onKeyHandler);
-      clearConsole();
-      startGame();
-    }
-  };
-
-  document.addEventListener('keydown', onKeyHandler);
+  clearConsole();
+  startGame();
 };
+
+exports.intro = intro;
 
 var getScore = function getScore(deck) {
   var result = 0;
@@ -203,10 +314,27 @@ var getStarterDeck = function getStarterDeck() {
   }
 
   playerCards.push(deck.random());
+  playerCards.push(getRandomCardFromDeck(deck, playerCards));
   return deck;
 };
 
 var getRandomCard = function getRandomCard(deck, cards) {
+  if (deck.length === 0) {
+    return _constants.DECK_CARDS.random();
+  }
+
+  var availableCards = cards.filter(function (c) {
+    return deck.indexOf(c) < 0;
+  });
+
+  if (availableCards.length === 0) {
+    availableCards = _constants.DECK_CARDS;
+  }
+
+  return availableCards.random();
+};
+
+var getRandomCardFromDeck = function getRandomCardFromDeck(deck, cards) {
   if (deck.length === 0) {
     return _constants.DECK_CARDS.random();
   }
@@ -220,6 +348,32 @@ var getRandomCard = function getRandomCard(deck, cards) {
   }
 
   return availableCards.random();
+};
+
+var waitForPlayerActions = function waitForPlayerActions() {
+  exports.playerTurn = playerTurn = true;
+
+  var onKeyHandler = function onKeyHandler(e) {
+    if (e.keyCode === 32) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      document.removeEventListener('keydown', onKeyHandler);
+      clearConsole();
+      exports.playerTurn = playerTurn = false;
+      drawAnotherCard();
+    }
+
+    if (e.keyCode === 27) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      document.removeEventListener('keydown', onKeyHandler);
+      clearConsole();
+      exports.playerTurn = playerTurn = false;
+      stopDrawing();
+    }
+  };
+
+  document.addEventListener('keydown', onKeyHandler);
 };
 
 var drawGameBoard = function drawGameBoard() {
@@ -237,32 +391,13 @@ var drawGameBoard = function drawGameBoard() {
   writeToConsole("<b class=\"opponent-log\">Opponent cards</b>: ".concat(opponentCards.join(", ")));
   writeToConsole("<b class=\"opponent-log\">Opponent score</b>: ".concat(getScore(opponentCards)));
   writeToConsole();
-
-  if (bProceed) {
-    writeToConsole("Press <b>[SPACEBAR]</b> to draw, or <b>[ESC]</b> to stop.");
-
-    var onKeyHandler = function onKeyHandler(e) {
-      if (e.keyCode === 32) {
-        document.removeEventListener('keydown', onKeyHandler);
-        clearConsole();
-        drawAnotherCard();
-      }
-
-      if (e.keyCode === 27) {
-        document.removeEventListener('keydown', onKeyHandler);
-        clearConsole();
-        stopDrawing();
-      }
-    };
-
-    document.addEventListener('keydown', onKeyHandler);
-  }
 };
 
 var startGame = function startGame() {
-  playerDeck = getStarterDeck();
+  exports.playerDeck = playerDeck = getStarterDeck();
   opponentDeck = getRandomDeck();
-  opponentCards = [opponentDeck.random()];
+  exports.opponentCards = opponentCards = [opponentDeck.random()];
+  waitForPlayerActions();
   drawGameBoard();
 };
 
@@ -272,103 +407,93 @@ var drawAnotherCard = function drawAnotherCard() {
     return;
   }
 
-  playerCards.push(getRandomCard(playerDeck, playerCards));
-  opponentCards.push(getRandomCard(opponentDeck, opponentCards));
+  playerCards.push(getRandomCardFromDeck(playerDeck, playerCards));
+
+  if (playerCards.length === 1) {
+    playerCards.push(getRandomCardFromDeck(playerDeck, playerCards));
+  }
+
   drawGameBoard();
+  setTimeout(function () {
+    opponentCards.push(_constants.DECK_CARDS.random());
+    waitForPlayerActions();
+    drawGameBoard();
+  }, 2000);
 };
 
 var clearCards = function clearCards() {
-  playerCards = [];
-  opponentCards = [];
+  exports.playerCards = playerCards = [];
+  exports.opponentCards = opponentCards = [];
 };
 
 var stopDrawing = function stopDrawing() {
-  if (opponentCards.length < opponentDeck.length) {
-    opponentCards.push(opponentDeck.random());
+  while (opponentCards.length < playerCards.length) {
+    opponentCards.push(_constants.DECK_CARDS.random());
   }
 
   drawGameBoard(false);
-  var playerScore = getScore(playerCards);
-  var opponentScore = getScore(opponentCards);
-  clearCards();
-  var gameResult = _constants.EGameResult.Tie;
+  setTimeout(function () {
+    var playerScore = getScore(playerCards);
+    var opponentScore = getScore(opponentCards);
+    clearCards();
+    var gameResult = _constants.EGameResult.Tie;
 
-  if (playerScore !== opponentScore) {
-    if (playerScore === 21) {
-      gameResult = _constants.EGameResult.Win;
-    } else if (playerScore < 21) {
-      if (opponentScore < playerScore) {
+    if (playerScore !== opponentScore) {
+      if (playerScore === 21) {
         gameResult = _constants.EGameResult.Win;
-      } else if (opponentScore < 21) {
-        gameResult = _constants.EGameResult.Lose;
+      } else if (playerScore < 21) {
+        if (opponentScore < playerScore) {
+          gameResult = _constants.EGameResult.Win;
+        } else if (opponentScore < 21) {
+          gameResult = _constants.EGameResult.Lose;
+        } else {
+          gameResult = _constants.EGameResult.Win;
+        }
       } else {
-        gameResult = _constants.EGameResult.Win;
-      }
-    } else {
-      if (opponentScore > playerScore) {
-        gameResult = _constants.EGameResult.Win;
-      } else {
-        // playerScore > opponentScore || opponentScore <= 21
-        gameResult = _constants.EGameResult.Lose;
+        if (opponentScore > playerScore) {
+          gameResult = _constants.EGameResult.Win;
+        } else {
+          // playerScore > opponentScore || opponentScore <= 21
+          gameResult = _constants.EGameResult.Lose;
+        }
       }
     }
-  }
 
-  switch (gameResult) {
-    case _constants.EGameResult.Win:
-      playerWins++;
-      writeToConsole("<b>Player Wins</b>");
-      break;
+    var modalContent = "";
 
-    case _constants.EGameResult.Lose:
-      opponentWins++;
-      writeToConsole("<b>Opponent Wins</b>");
-      break;
+    switch (gameResult) {
+      case _constants.EGameResult.Win:
+        playerWins++;
+        modalContent = "You Win!";
+        break;
 
-    case _constants.EGameResult.Tie:
-      writeToConsole("<b>Tie</b>");
-      break;
-  }
+      case _constants.EGameResult.Lose:
+        opponentWins++;
+        modalContent = "You Lose!";
+        break;
 
-  if (playerWins < 2 && opponentWins < 2) {
-    writeToConsole("Press <b>[SPACEBAR]</b> to proceed.");
+      case _constants.EGameResult.Tie:
+        modalContent = "Tie!";
+        break;
+    }
 
-    var onKeyHandler = function onKeyHandler(e) {
-      if (e.keyCode === 32) {
-        document.removeEventListener('keydown', onKeyHandler);
+    (0, _graphics.showModal)("Turn ended.", modalContent, "[<b>SPACEBAR</b>] continue.", "", function () {
+      if (playerWins < 2 && opponentWins < 2) {
         clearConsole();
         drawAnotherCard();
+      } else {
+        turnEnded();
       }
-    };
-
-    document.addEventListener('keydown', onKeyHandler);
-  } else {
-    showEndGame();
-  }
+    });
+  }, 2000);
 };
 
-var showEndGame = function showEndGame() {
+var turnEnded = function turnEnded() {
   if (playerWins === 2) {
-    writeToConsole("Congratulations, you win this match!");
-    writeToConsole("Press <b>[SPACEBAR]</b> to proceed.");
+    newLevel();
   } else {
-    writeToConsole("Oh no, you lose this match!");
-    writeToConsole("Press <b>[SPACEBAR]</b> to restart.");
+    window.location.reload();
   }
-
-  var onKeyHandler = function onKeyHandler(e) {
-    if (e.keyCode === 32) {
-      document.removeEventListener('keydown', onKeyHandler);
-
-      if (playerWins === 2) {
-        newLevel();
-      } else {
-        window.location.reload();
-      }
-    }
-  };
-
-  document.addEventListener('keydown', onKeyHandler);
 };
 
 var newLevel = function newLevel() {
@@ -390,7 +515,15 @@ var newLevel = function newLevel() {
 
 var chooseRandomCard = function chooseRandomCard() {
   var cards = [_constants.DECK_CARDS.random(), _constants.DECK_CARDS.random()];
-  writeToConsole("Choose a card to add to your deck: <b>[1] ".concat(cards[0], "</b> <b>[2] ").concat(cards[1], "</b>"));
+  (0, _graphics.showModal)("Choose a new card.", "Choose a card to add to your deck:", "[2] <b>".concat(cards[1], "</b>"), "[1] <b>".concat(cards[0], "</b>"), function () {
+    playerDeck.push(cards[1]);
+    clearConsole();
+    drawAnotherCard();
+  }, function () {
+    playerDeck.push(cards[0]);
+    clearConsole();
+    drawAnotherCard();
+  });
 
   var onKeyHandler = function onKeyHandler(e) {
     if (e.keyCode === 49) {
@@ -410,11 +543,15 @@ var chooseRandomCard = function chooseRandomCard() {
 
   document.addEventListener('keydown', onKeyHandler);
 };
+},{"../constants":"js/constants.js","./graphics":"js/game/graphics.js"}],"js/main.js":[function(require,module,exports) {
+"use strict";
+
+var _logic = require("./game/logic");
 
 (function () {
-  intro();
+  (0, _logic.intro)();
 })();
-},{"./constants":"js/constants.js"}],"node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
+},{"./game/logic":"js/game/logic.js"}],"node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
 var global = arguments[3];
 var OVERLAY_ID = '__parcel__error__overlay__';
 var OldModule = module.bundle.Module;
@@ -442,7 +579,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "55236" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "65408" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};
